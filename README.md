@@ -16,4 +16,4 @@
 
 在任意一台纯净的 Linux 服务器（推荐 **Debian 12** 或 Ubuntu 22.04）上，使用 `root` 用户登录并执行以下命令：
 ```bash
-bash <(curl -sL [https://ghproxy.net/https://raw.githubusercontent.com/rockchen099-maker/realm-manager/main/realm.sh](https://ghproxy.net/https://raw.githubusercontent.com/rockchen099-maker/realm-manager/main/realm.sh))
+bash <(curl -sL https://ghproxy.net/https://raw.githubusercontent.com/rockchen099-maker/realm-manager/main/realm.sh)
