@@ -19,7 +19,7 @@ fi
 
 check_and_fix_env() {
     echo -e "${YELLOW}正在检测系统环境及依赖...${NC}"
-    # 自动识别安装命令
+    # 自动识别安装命令 (支持 Alpine/Debian/Ubuntu/CentOS)[cite: 1]
     if command -v apk >/dev/null 2>&1; then
         INSTALL_CMD="apk add --no-cache"
     elif command -v apt-get >/dev/null 2>&1; then
@@ -30,7 +30,7 @@ check_and_fix_env() {
         yum install -y epel-release >/dev/null 2>&1
     fi
 
-    # 安装基础依赖
+    # 安装基础依赖[cite: 1]
     for cmd in jq curl tar; do
         if ! command -v $cmd &> /dev/null; then
             echo -e "${CYAN}安装依赖: $cmd...${NC}"
@@ -39,22 +39,21 @@ check_and_fix_env() {
     done
 }
 
-# ================= 2. 智能网络源选择 =================
+# ================= 2. 智能下载源选择 =================
 get_download_url() {
-    # 官方源
+    # 官方源[cite: 1]
     OFFICIAL_URL="https://github.com/zhboner/realm/releases/latest/download/realm-x86_64-unknown-linux-gnu.tar.gz"
-    # 镜像源列表
+    # 镜像源列表 (适配国内机)[cite: 1]
     MIRRORS=(
         "https://mirror.ghproxy.com/$OFFICIAL_URL"
         "https://ghproxy.net/$OFFICIAL_URL"
         "https://github.moeyy.xyz/$OFFICIAL_URL"
     )
 
-    # 测试直连 GitHub 速度
+    # 测试直连 GitHub 速度[cite: 1]
     if curl -Is --connect-timeout 3 https://github.com >/dev/null 2>&1; then
         echo "$OFFICIAL_URL"
     else
-        # 依次返回镜像源
         for url in "${MIRRORS[@]}"; do
             echo "$url"
         done
@@ -67,7 +66,7 @@ install_realm() {
     
     mkdir -p $CONFIG_DIR
     
-    # 尝试多源下载
+    # 尝试多源下载[cite: 1]
     SUCCESS=false
     URLS=$(get_download_url)
     for URL in $URLS; do
@@ -91,7 +90,7 @@ install_realm() {
     chmod +x realm && mv realm $BIN_FILE
     rm -f realm.tar.gz
 
-    # 初始化配置
+    # 初始化配置结构[cite: 1]
     if [ ! -f "$CONFIG_FILE" ]; then
         cat > $CONFIG_FILE << EOCC
 {
@@ -104,7 +103,7 @@ install_realm() {
 EOCC
     fi
 
-    # 写入 Systemd (仅限支持 systemd 的系统，如 Debian/Ubuntu/CentOS)
+    # 写入系统服务守护 (兼容 Systemd 系统)[cite: 1]
     if command -v systemctl >/dev/null 2>&1; then
         cat > /etc/systemd/system/realm.service << EOSS
 [Unit]
@@ -128,13 +127,13 @@ EOSS
         systemctl restart realm
     fi
 
-    # 4. 内核极致优化 (BBR + 链路)[cite: 1]
+    # 内核极致优化 (BBR + 链路参数)[cite: 1]
     echo -e "${YELLOW}正在注入中转机专属内核参数...${NC}"
     if [ -w /etc/sysctl.conf ]; then
         sed -i '/net.core/d' /etc/sysctl.conf
         sed -i '/net.ipv4/d' /etc/sysctl.conf
         cat >> /etc/sysctl.conf << EOT
-# Realm 中转优化
+# Realm 中转加速调优
 net.core.default_qdisc=fq
 net.ipv4.tcp_congestion_control=bbr
 net.ipv4.ip_forward=1
@@ -153,9 +152,9 @@ EOT
     sleep 2
 }
 
-# ================= 4. 规则管理逻辑 =================
+# ================= 4. 转发管理逻辑 =================
 add_rule() {
-    if [ ! -f "$BIN_FILE" ]; then echo -e "${RED}请先执行安装！${NC}"; sleep 2; return; fi
+    if [ ! -f "$BIN_FILE" ]; then echo -e "${RED}请先执行选 1 安装！${NC}"; sleep 2; return; fi
     echo -e "${CYAN}--- 添加新转发规则 ---${NC}"
     read -p "请输入 [本地监听端口]: " LOCAL_PORT
     read -p "请输入 [目标落地机IP]: " REMOTE_IP
@@ -165,8 +164,10 @@ add_rule() {
         echo -e "${RED}输入不能为空。${NC}"; sleep 2; return
     fi
 
+    # 使用 jq 原子化更新配置[cite: 1]
     jq '.endpoints += [{"listen": "0.0.0.0:'$LOCAL_PORT'", "remote": "'$REMOTE_IP':'$REMOTE_PORT'"}]' $CONFIG_FILE > tmp.json && mv tmp.json $CONFIG_FILE
     
+    # 自动重启服务
     if command -v systemctl >/dev/null 2>&1; then
         systemctl restart realm
     else
@@ -208,7 +209,7 @@ delete_rule() {
             killall realm 2>/dev/null
             nohup $BIN_FILE -c $CONFIG_FILE >/dev/null 2>&1 &
         fi
-        echo -e "${GREEN}✅ 规则已删除！${NC}"
+        echo -e "${GREEN}✅ 规则已成功删除！${NC}"
     fi
     sleep 2
 }
@@ -228,11 +229,11 @@ while true; do
         echo -e "  服务状态: ${RED}未运行${NC}"
     fi
     echo -e ""
-    echo -e "  ${YELLOW}1.${NC} 安装/更新 Realm (含链路调优)"
+    echo -e "  ${YELLOW}1.${NC} 安装/更新 Realm (智能选源+链路优化)"
     echo -e "  ${YELLOW}2.${NC} 添加转发映射"
-    echo -e "  ${YELLOW}3.${NC} 查看/导出映射列表"
+    echo -e "  ${YELLOW}3.${NC} 查看映射列表"
     echo -e "  ${YELLOW}4.${NC} 删除映射"
-    echo -e "  ${YELLOW}5.${NC} 重启服务"
+    echo -e "  ${YELLOW}5.${NC} 手动重启服务"
     echo -e "  ${YELLOW}0.${NC} 退出脚本"
     echo -e "${GREEN}=================================================${NC}"
     read -p "请选择 [0-5]: " OPTION
