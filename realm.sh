@@ -82,7 +82,7 @@ install_realm() {
     done
 
     if [ "$SUCCESS" = false ]; then
-        echo -e "${RED}❌ 无法从任何源下载 Realm，请检查网络！${NC}"
+        echo -e "${RED}❌ 无法从任何源下载 Realm，请检查网络或防火墙！${NC}"
         return
     fi
     
@@ -103,7 +103,7 @@ install_realm() {
 EOCC
     fi
 
-    # 写入系统服务守护 (兼容 Systemd 系统)[cite: 1]
+    # 写入系统服务守护 (针对支持 Systemd 的系统)[cite: 1]
     if command -v systemctl >/dev/null 2>&1; then
         cat > /etc/systemd/system/realm.service << EOSS
 [Unit]
@@ -167,7 +167,7 @@ add_rule() {
     # 使用 jq 原子化更新配置[cite: 1]
     jq '.endpoints += [{"listen": "0.0.0.0:'$LOCAL_PORT'", "remote": "'$REMOTE_IP':'$REMOTE_PORT'"}]' $CONFIG_FILE > tmp.json && mv tmp.json $CONFIG_FILE
     
-    # 自动重启服务
+    # 重启服务使之生效
     if command -v systemctl >/dev/null 2>&1; then
         systemctl restart realm
     else
